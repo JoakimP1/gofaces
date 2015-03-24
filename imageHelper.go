@@ -97,7 +97,7 @@ func CreatePictureFromVector(imgVector []float64, width, height int, path string
 	newImg.WriteImage(path)
 }
 
-func GetNormalizedByteVectorFromFile(width, height int, path string) []byte {
+func GetNormalizedCroppedByteVectorFromFile(width, height int, path string) []byte {
 
 	mw := imagick.NewMagickWand()
 	defer mw.Destroy()
@@ -120,6 +120,18 @@ func GetNormalizedByteVectorFromFile(width, height int, path string) []byte {
 	return mw.GetImageBlob()
 }
 
+//func GetImageFromFile(path string) []byte {
+//	file, err := os.Open(path)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	defer file.Close()
+//	img, err := pgm.Decode(file)
+//	if err != nil {
+//		log.Fatal(os.Stderr, "%s: %v\n", "./selfcss.png", err)
+//	}
+//}
+
 func GetByteVectorFromFile(path string) []byte {
 
 	mw := imagick.NewMagickWand()
@@ -129,7 +141,24 @@ func GetByteVectorFromFile(path string) []byte {
 	if err != nil {
 		panic(err)
 	}
-	mw.SetImageFormat("jpeg")
+	mw.SetImageFormat("PGM")
+	return mw.GetImageBlob()
+}
+
+func GetNormalizedByteVectorFromFile(path string) []byte {
+
+	mw := imagick.NewMagickWand()
+	defer mw.Destroy()
+
+	err := mw.ReadImage(path)
+	if err != nil {
+		panic(err)
+	}
+	mw.TransformImageColorspace(imagick.COLORSPACE_RGB)
+	mw.SeparateImageChannel(1)
+	mw.LevelImage(0, 2, 65535)
+
+	mw.SetImageFormat("JPEG")
 	return mw.GetImageBlob()
 }
 
@@ -223,12 +252,12 @@ func GetNormalizedPixelVectorFromFile(width, height int, path string) []float64 
 	return pixelVector
 }
 
-func alignFaceInImage(img *[]byte, face face) []byte {
+func AlignFaceInImage(img []byte, face face) []byte {
 
 	mw := imagick.NewMagickWand()
 	// Schedule cleanup
 	defer mw.Destroy()
-	err := mw.ReadImageBlob(*img)
+	err := mw.ReadImageBlob(img)
 	if err != nil {
 		panic(err)
 	}
@@ -244,7 +273,7 @@ func alignFaceInImage(img *[]byte, face face) []byte {
 	srt[4] = face.Angle()
 	srt[5] = float64((int(mw.GetImageWidth()) / 2) - int(center2.x-center.x))
 	srt[6] = float64(int(mw.GetImageWidth()) / 2)
-
+	fmt.Println(srt)
 	mw.DistortImage(imagick.DISTORTION_SCALE_ROTATE_TRANSLATE, srt, false)
 
 	return mw.GetImageBlob()

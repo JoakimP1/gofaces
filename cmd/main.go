@@ -61,30 +61,27 @@ func main() {
 	width := 100
 	height := 100
 
-	pictureFiles = GetFileNames(*filePath + "jpg/train1/")
-
-	images := make([][]byte, len(pictureFiles), width*height)
-
-	for i := 0; i < len(pictureFiles); i++ {
-		images[i] = gofaces.GetByteVectorFromFile(pictureFiles[i])
-		//fmt.Println(pictureFiles[i], gofaces.GetNormalizedByteVectorFromFile(width, height, pictureFiles[i]))
-	}
-	//	fmt.Println(pictureFiles[0], len(images[0]), images[0])
-	//	fmt.Println(pictureFiles[0], len(gofaces.GetNormalizedPixelVectorFromFile(width, height, pictureFiles[0])), gofaces.GetNormalizedPixelVectorFromFile(width, height, pictureFiles[0])[0:20])
-	//	fmt.Println(pictureFiles[0], len(gofaces.GetNormalizedPixelVectorFromBuffer(width, height, images[0])), gofaces.GetNormalizedPixelVectorFromBuffer(width, height, images[0])[0:20])
-
-	//	for j := 0; j < width*height; j++ {
-	//		pixelMatrix[j][i] = tempMatrix[j]
+	//	pictureFiles = GetFileNames(*filePath + "jpg/train1/")
+	//
+	images := make([][]byte, 10, width*height)
+	//
+	//	for i := 0; i < len(pictureFiles); i++ {
+	//		images[i] = gofaces.GetByteVectorFromFile(pictureFiles[i])
 	//	}
+
+	images[0] = gofaces.GetNormalizedByteVectorFromFile("/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/tantan/newfacesmall2.jpg")
 	faces := gofaces.Detect(images[0])
+
 	foo := gofaces.PaintFace(images[0], faces[0])
-	fmt.Println(faces)
+
+	//foo = gofaces.AlignFaceInImage(foo, faces[0])
+
+	fmt.Println(faces[0], faces[0].DistanceBetweenEyes(), faces[0].Width(), float64(faces[0].DistanceBetweenEyes())/float64(faces[0].Width()))
+
 	win := opencv.NewWindow("Face Detection")
 	defer win.Destroy()
 
-	printImg := opencv.DecodeImageMem(foo)
-	//printImg := opencv.DecodeImageMem(gofaces.PixelVectorToImage(gofaces.GetNormalizedPixelVectorFromBuffer(width, height, images[0]), 100, 100))
-	win.ShowImage(printImg)
+	win.ShowImage(opencv.DecodeImageMem(foo))
 	opencv.WaitKey(0)
 
 	//

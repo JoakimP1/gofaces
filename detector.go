@@ -2,6 +2,7 @@ package gofaces
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/lazywei/go-opencv/opencv"
 	"image/jpeg"
 	"math"
@@ -27,12 +28,31 @@ func (c *pixelCoord) Center() pixelCoord {
 	}
 }
 
+func (f *face) Width() int {
+
+	return f.coord.width
+}
+
 func (f *face) Center() pixelCoord {
 	le := f.eye_left.Center()
 	return pixelCoord{
 		x: le.x + le.Distance(f.eye_right.Center())/2,
 		y: le.y,
 	}
+}
+
+func (f *face) DistanceBetweenEyes() int {
+	le := f.eye_left.Center()
+	re := f.eye_right.Center()
+	return re.x - le.x
+}
+
+func (f *face) LeftEye() pixelCoord {
+	return f.eye_left
+}
+
+func (f *face) RightEye() pixelCoord {
+	return f.eye_right
 }
 
 type face struct {
@@ -49,6 +69,7 @@ func (face *face) Angle() float64 {
 	if r > 0.0 {
 		return r
 	} else {
+		//		return (-r * 360) / math.Pi
 		return (-r * 180) / math.Pi
 	}
 }
@@ -63,10 +84,20 @@ func PaintFace(img []byte, face face) []byte {
 	opencv.Rectangle(image,
 		opencv.Point{face.coord.x + face.coord.width, face.coord.y},
 		opencv.Point{face.coord.x, face.coord.y + face.coord.height},
-		opencv.ScalarAll(255.0), 1, 1, 0)
+		opencv.ScalarAll(0), 1, 1, 0)
+
+	opencv.Circle(image,
+		opencv.Point{face.eye_left.x + face.eye_left.width/2, face.eye_left.y + face.eye_left.height/2},
+		2,
+		opencv.ScalarAll(255), 1, 1, 0)
+
+	opencv.Circle(image,
+		opencv.Point{face.eye_right.x + face.eye_right.width/2, face.eye_right.y + face.eye_right.height/2},
+		2,
+		opencv.ScalarAll(255), 1, 1, 0)
 
 	buf := new(bytes.Buffer)
-	err := jpeg.Encode(buf, image.ToImage(), nil))
+	err := jpeg.Encode(buf, image.ToImage(), nil)
 	if err != nil {
 		panic(err)
 	}
@@ -101,7 +132,12 @@ func Detect(img []byte) faces {
 
 		eyes := eyeCascade.DetectObjects(image)
 		if len(eyes) < 2 {
-			panic("Less than 2 eyes found")
+			fmt.Println(len(eyes), " eyes found")
+			return append(faces, face{
+				coord:     faceCoords,
+				eye_left:  pixelCoord{},
+				eye_right: pixelCoord{},
+			})
 		}
 
 		eye_1 := pixelCoord{
