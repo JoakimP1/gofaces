@@ -263,17 +263,27 @@ func AlignFaceInImage(img []byte, face face) []byte {
 	}
 
 	center := face.eye_left.Center()
-	center2 := face.Center()
+	newCenter := face.eye_left.Center().x - face.Center().x
+	//fmt.Println("Face Center: ", center2, "Left eye Center: ", center)
 
+	//X,Y ScaleX,ScaleY Angle  NewX,NewY
 	srt := make([]float64, 7)
-	srt[0] = float64(center.x)
-	srt[1] = float64(center.y)
+
+	//X 149.5
+	srt[0] = float64(center.x) + 0.5
+	//Y 160.5
+	srt[1] = float64(center.y) + 0.5
+	//Scale
 	srt[2] = float64(1)
 	srt[3] = float64(1)
+	//Angle 8.21920924889906
 	srt[4] = face.Angle()
-	srt[5] = float64((int(mw.GetImageWidth()) / 2) - int(center2.x-center.x))
-	srt[6] = float64(int(mw.GetImageWidth()) / 2)
-	fmt.Println(srt)
+	//NewX 147
+	srt[5] = float64((int(mw.GetImageWidth())/2)+newCenter) + 0.5
+	//NewY 192
+	srt[6] = float64(int(mw.GetImageHeight()) / 2)
+
+	//fmt.Println(srt)
 	mw.DistortImage(imagick.DISTORTION_SCALE_ROTATE_TRANSLATE, srt, false)
 
 	return mw.GetImageBlob()

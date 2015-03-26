@@ -70,11 +70,14 @@ func main() {
 	//	}
 
 	images[0] = gofaces.GetNormalizedByteVectorFromFile("/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/tantan/newfacesmall2.jpg")
-	faces := gofaces.Detect(images[0])
+	//images[0] = gofaces.GetNormalizedByteVectorFromFile("/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/train2/BioID_0018.pgm")
 
+	faceDetector := gofaces.NewFaceDetector()
+	faces := faceDetector.Detect(images[0])
 	foo := gofaces.PaintFace(images[0], faces[0])
 
-	//foo = gofaces.AlignFaceInImage(foo, faces[0])
+	foo = gofaces.AlignFaceInImage(foo, faces[0])
+	foo = gofaces.Crosshair(foo)
 
 	fmt.Println(faces[0], faces[0].DistanceBetweenEyes(), faces[0].Width(), float64(faces[0].DistanceBetweenEyes())/float64(faces[0].Width()))
 
