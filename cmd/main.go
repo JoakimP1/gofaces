@@ -69,8 +69,8 @@ func main() {
 	//		images[i] = gofaces.GetByteVectorFromFile(pictureFiles[i])
 	//	}
 
-	images[0] = gofaces.GetNormalizedByteVectorFromFile("/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/tantan/newfacesmall2.jpg")
-	//images[0] = gofaces.GetNormalizedByteVectorFromFile("/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/train2/BioID_0018.pgm")
+	//images[0] = gofaces.GetNormalizedByteVectorFromFile("/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/tantan/newfacesmall2.jpg")
+	images[0] = gofaces.GetNormalizedByteVectorFromFile("/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/train2/BioID_0018.pgm")
 
 	faceDetector := gofaces.NewFaceDetector()
 	faces := faceDetector.Detect(images[0])
