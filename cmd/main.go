@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"github.com/lazywei/go-opencv/opencv"
 	"math/rand"
+	"strconv"
 	"time"
 )
 
@@ -56,37 +57,67 @@ func init() {
 
 }
 
-func main() {
+func loop(path string, paint, crosshair bool) {
 
-	width := 100
-	height := 100
+	pictureFiles = GetFileNames(*filePath + path)
 
-	//	pictureFiles = GetFileNames(*filePath + "jpg/train1/")
-	//
-	images := make([][]byte, 10, width*height)
-	//
-	//	for i := 0; i < len(pictureFiles); i++ {
-	//		images[i] = gofaces.GetByteVectorFromFile(pictureFiles[i])
-	//	}
-
-	//images[0] = gofaces.GetNormalizedByteVectorFromFile("/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/tantan/newfacesmall2.jpg")
-	images[0] = gofaces.GetNormalizedByteVectorFromFile("/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/train2/BioID_0018.pgm")
-
+	images := make([][]byte, len(pictureFiles))
 	faceDetector := gofaces.NewFaceDetector()
-	faces := faceDetector.Detect(images[0])
-	foo := gofaces.PaintFace(images[0], faces[0])
 
-	foo = gofaces.AlignFaceInImage(foo, faces[0])
-	foo = gofaces.Crosshair(foo)
+	for i := 0; i < len(pictureFiles); i++ {
+		images[i] = gofaces.GetNormalizedByteVectorFromFile("/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/train1/" + strconv.Itoa(i) + ".jpg")
+	}
+	fmt.Println("Pictures: ", len(pictureFiles))
 
-	fmt.Println(faces[0], faces[0].DistanceBetweenEyes(), faces[0].Width(), float64(faces[0].DistanceBetweenEyes())/float64(faces[0].Width()))
+	for i := 0; i < len(pictureFiles); i++ {
+
+		fmt.Println("Processing picture: ", i)
+
+		faces := faceDetector.Detect(images[i])
+		if paint {
+			images[i] = gofaces.PaintFace(images[i], faces[0])
+		}
+
+		alignedFace := gofaces.AlignFaceInImage(images[i], faces[0])
+
+		if crosshair {
+			alignedFace = gofaces.Crosshair(alignedFace)
+		}
+
+		cropface := gofaces.CropOutFace(alignedFace, faces[0])
+
+		win := opencv.NewWindow("Face Detection")
+
+		win.ShowImage(opencv.DecodeImageMem(cropface))
+		opencv.WaitKey(0)
+		win.Destroy()
+	}
+}
+
+func one(path string, paint bool) {
+	faceDetector := gofaces.NewFaceDetector()
+
+	picture := gofaces.GetNormalizedByteVectorFromFile(path)
+	faces := faceDetector.Detect(picture)
+	if paint {
+		picture = gofaces.PaintFace(picture, faces[0])
+	}
+	picture = gofaces.AlignFaceInImage(picture, faces[0])
+	picture = gofaces.CropOutFace(picture, faces[0])
 
 	win := opencv.NewWindow("Face Detection")
 	defer win.Destroy()
 
-	win.ShowImage(opencv.DecodeImageMem(foo))
+	win.ShowImage(opencv.DecodeImageMem(picture))
 	opencv.WaitKey(0)
+}
 
+func main() {
+
+	//	/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/train1/5.jpg
+	//
+	//one("/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/train1/15.jpg", true)
+	loop("jpg/train1/", true, true)
 	//
 	//
 	//

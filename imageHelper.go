@@ -151,14 +151,16 @@ func GetNormalizedByteVectorFromFile(path string) []byte {
 	defer mw.Destroy()
 
 	err := mw.ReadImage(path)
+
 	if err != nil {
 		panic(err)
 	}
+	mw.SetImageFormat("JPEG")
+
 	mw.TransformImageColorspace(imagick.COLORSPACE_RGB)
 	mw.SeparateImageChannel(1)
 	mw.LevelImage(0, 2, 65535)
 
-	mw.SetImageFormat("JPEG")
 	return mw.GetImageBlob()
 }
 
@@ -252,6 +254,26 @@ func GetNormalizedPixelVectorFromFile(width, height int, path string) []float64 
 	return pixelVector
 }
 
+func CropOutFace(img []byte, face face) []byte {
+	mw := imagick.NewMagickWand()
+	// Schedule cleanup
+	defer mw.Destroy()
+
+	err := mw.ReadImageBlob(img)
+	if err != nil {
+		panic(err)
+	}
+
+	newWidth := face.coord.Width()
+	newHeight := face.coord.Height()
+
+	newX := (int(mw.GetImageWidth()) / 2) - (newWidth / 2)
+	newY := (int(mw.GetImageHeight()) / 2) - (newHeight / 2)
+
+	mw.CropImage(uint(newWidth), uint(float64(newHeight)*1.2), newX, newY)
+	return mw.GetImageBlob()
+}
+
 func AlignFaceInImage(img []byte, face face) []byte {
 
 	mw := imagick.NewMagickWand()
@@ -287,5 +309,4 @@ func AlignFaceInImage(img []byte, face face) []byte {
 	mw.DistortImage(imagick.DISTORTION_SCALE_ROTATE_TRANSLATE, srt, false)
 
 	return mw.GetImageBlob()
-
 }
