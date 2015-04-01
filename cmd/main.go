@@ -59,7 +59,7 @@ func init() {
 
 func loop(path string, paint, crosshair bool) {
 
-	pictureFiles = GetFileNames(*filePath + path)
+	pictureFiles = GetFileNames(path)
 
 	images := make([][]byte, len(pictureFiles))
 	faceDetector := gofaces.NewFaceDetector()
@@ -116,8 +116,11 @@ func main() {
 
 	//	/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/train1/5.jpg
 	//
-	//one("/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/train1/15.jpg", true)
-	loop("jpg/train1/", true, true)
+	//one("/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/train1/16.jpg", true)
+	//one("/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/train1/18.jpg", true)
+	//one("/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/train1/1.jpg", true)
+	//one("/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/train1/16.jpg", true)
+	loop(*filePath+"jpg/train1/", true, true)
 	//
 	//
 	//

@@ -145,12 +145,27 @@ func GetByteVectorFromFile(path string) []byte {
 	return mw.GetImageBlob()
 }
 
+func Flop(img []byte) []byte {
+
+	mw := imagick.NewMagickWand()
+	defer mw.Destroy()
+
+
+	err := mw.ReadImageBlob(img)
+	if err != nil {
+		panic(err)
+	}
+	mw.FlopImage()
+	return mw.GetImageBlob()
+}
+
 func GetNormalizedByteVectorFromFile(path string) []byte {
 
 	mw := imagick.NewMagickWand()
 	defer mw.Destroy()
 
 	err := mw.ReadImage(path)
+	mw.FlopImage()
 
 	if err != nil {
 		panic(err)

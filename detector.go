@@ -84,12 +84,14 @@ type faces []face
 func (face *face) Angle() float64 {
 
 	r := math.Atan2(float64(face.eye_right.Center().y-face.eye_left.Center().y), float64(face.eye_right.Center().x-face.eye_left.Center().x))
-	if r > 0.0 {
-		return r
-	} else {
-		//		return (-r * 360) / math.Pi
-		return (-r * 180) / math.Pi
-	}
+
+	return (-r * 180) / math.Pi
+	//	if r > 0.0 {
+	//		return r
+	//	} else {
+	//		//		return (-r * 360) / math.Pi
+	//		return (-r * 180) / math.Pi
+	//	}
 }
 
 type FaceDetector struct {
@@ -112,6 +114,86 @@ func NewFaceDetector() *FaceDetector {
 		noseCascade:     opencv.LoadHaarClassifierCascade("/home/joakim/opencv-2.4.9/data/haarcascades/haarcascade_mcs_nose.xml"),
 	}
 	return detector
+}
+
+func (detector *FaceDetector) DetectEyes(image *opencv.IplImage, roi opencv.Rect) (leftEyes, rightEyes []pixelCoord) {
+
+	var topFaceLeft, topFaceRight opencv.Rect
+
+	topFaceLeft.Init(roi.X(), roi.Y()+int(float64(roi.Height())*0.20), roi.Width()/2, int(float64(roi.Height())/2))
+	topFaceRight.Init(roi.X()+roi.Width()/2, roi.Y()+int(float64(roi.Height())*0.20), roi.Width()/2, int(float64(roi.Height())/2))
+
+	image.SetROI(topFaceLeft)
+	for _, eye := range detector.eyeCascade.DetectObjects(image) {
+		leftEyes = append(leftEyes, pixelCoord{
+			x:      eye.X() + topFaceLeft.X(),
+			y:      eye.Y() + topFaceLeft.Y(),
+			width:  eye.Width(),
+			height: eye.Height(),
+		})
+	}
+	fmt.Println(len(leftEyes), " left eyes found")
+
+	image.SetROI(topFaceRight)
+	for _, eye := range detector.righteyeCascade.DetectObjects(image) {
+		rightEyes = append(rightEyes, pixelCoord{
+			x:      eye.X() + topFaceRight.X(),
+			y:      eye.Y() + topFaceRight.Y(),
+			width:  eye.Width(),
+			height: eye.Height(),
+		})
+	}
+	fmt.Println(len(rightEyes), " right eyes found")
+
+	return
+}
+
+func FindBestEyes(leftEyes, rightEyes []pixelCoord) (leftEye, rightEye pixelCoord) {
+
+	var bestEye, bestDist, dist int
+
+	if len(rightEyes) == 1 && len(leftEyes) == 1 {
+		return leftEyes[0], rightEyes[0]
+
+	} else if len(rightEyes) > 1 && len(leftEyes) == 1 {
+		//Left Eye Found, right Eye multiple eyes
+		leftEye = leftEyes[0]
+		//Find the best eye with the lowest distance
+
+		for key, eye := range rightEyes {
+			dist = leftEye.Distance(eye)
+			fmt.Println("Dist", dist)
+
+			if dist < bestDist || bestDist == 0 {
+				bestEye = key
+				bestDist = dist
+			}
+			fmt.Println("bestDist", bestDist)
+			fmt.Println("bestEye", bestEye)
+
+		}
+		fmt.Println("bestEye", rightEyes[bestEye])
+
+		rightEye = rightEyes[bestEye]
+
+	} else if len(rightEyes) == 1 && len(leftEyes) > 1 {
+		//Right Eye Found, left Eye multiple eyes
+		rightEye = rightEyes[0]
+		//Find the best eye with the lowest distance
+
+		for key, eye := range leftEyes {
+			dist = rightEye.Distance(eye)
+
+			if dist < bestDist || bestDist == 0 {
+				bestEye = key
+				bestDist = dist
+			}
+		}
+		leftEye = leftEyes[bestEye]
+
+	}
+
+	return leftEye, rightEye
 }
 
 func (detector *FaceDetector) DetectFaces(image *opencv.IplImage) faces {
@@ -138,110 +220,41 @@ func (detector *FaceDetector) DetectFaces(image *opencv.IplImage) faces {
 			height: detFace.Height(),
 		}
 
-		var topFaceLeft opencv.Rect
-		topFaceLeft.Init(detFace.X(), detFace.Y()+int(float64(detFace.Height())*0.20), detFace.Width()/2, int(float64(detFace.Height())/2))
+		leftEyes, rightEyes := detector.DetectEyes(image, *detFace)
 
-		var topFaceRight opencv.Rect
-		topFaceRight.Init(detFace.X()+detFace.Width()/2, detFace.Y()+int(float64(detFace.Height())*0.20), detFace.Width()/2, int(float64(detFace.Height())/2))
+		if len( leftEyes ) == 0 || len(rightEyes) == 0 {
+			floppedImage := opencv.DecodeImageMem(Flop(ToByteBuffer(image)))
 
-		image.SetROI(topFaceLeft)
-		lefteye := detector.eyeCascade.DetectObjects(image)
-
-		eye_1 := pixelCoord{
-			x:      lefteye[0].X() + topFaceLeft.X(),
-			y:      lefteye[0].Y() + topFaceLeft.Y(),
-			width:  lefteye[0].Width(),
-			height: lefteye[0].Height(),
-		}
-
-		image.SetROI(topFaceRight)
-
-		righteye := detector.righteyeCascade.DetectObjects(image)
-		var bestEye = 0
-
-		if len(righteye) > 1 {
-			bestDist := 0
-			dist := 0
-
-			for key, eye := range righteye {
-				dist = eye_1.y - (eye.Y() + topFaceRight.Y())
-				if dist < bestDist {
-					bestEye = key
-				}
-			}
+			leftEyes, rightEyes := detector.DetectEyes(floppedImage, *detFace)
 
 		}
 
-		eye_2 := pixelCoord{
-			x:      righteye[bestEye].X() + topFaceRight.X(),
-			y:      righteye[bestEye].Y() + topFaceRight.Y(),
-			width:  righteye[bestEye].Width(),
-			height: righteye[bestEye].Height(),
-		}
-
-		fmt.Println(len(lefteye), " left eyes found")
-		fmt.Println(len(righteye), " right eyes found")
-
-		//		if len(lefteye) < 1 || len(righteye) < 1 {
-		//			return append(faces, face{
-		//				coord:     faceCoords,
-		//				eye_left:  pixelCoord{},
-		//				eye_right: pixelCoord{},
-		//			})
-		//		}
-
-		//		eye_2 := pixelCoord{
-		//			x:      righteye[0].X() + topFaceRight.X(),
-		//			y:      righteye[0].Y() + topFaceRight.Y(),
-		//			width:  righteye[0].Width(),
-		//			height: righteye[0].Height(),
-		//		}
-
-		//
-		//		image.ResetROI()
-		//		fmt.Println(detFace.X(), int(detFace.Y()+detFace.Height()/2), detFace.Width(), int(detFace.Height()/2))
-		//		var lowerFace opencv.Rect
-		//		lowerFace.Init(detFace.X(), int(detFace.Y()+detFace.Height()/2), detFace.Width(), int(detFace.Height()/2))
-		//		image.SetROI(lowerFace)
-		//
-		//		mouths := detector.mouthCascade.DetectObjects(image)
-		//
-		//		fmt.Println(len(mouths), " mouths found")
-		//
-		//		mouth1 := pixelCoord{
-		//			x:      mouths[0].X() + lowerFace.X(),
-		//			y:      mouths[0].Y() + lowerFace.Y(),
-		//			width:  mouths[0].Width(),
-		//			height: mouths[0].Height(),
-		//		}
+		leftEye, rightEye := FindBestEyes(leftEyes, rightEyes)
 
 		faces = append(faces, face{
 			coord:     faceCoords,
-			eye_left:  eye_1,
-			eye_right: eye_2,
+			eye_left:  leftEye,
+			eye_right: rightEye,
 			//				mouth:     mouth1,
 		})
 
-		////		sometimes eyes are inversed ! we switch them
-		//				if eye_1.x < eye_2.x {
-		//					faces = append(faces, face{
-		//						coord:     faceCoords,
-		//						eye_left:  eye_1,
-		//						eye_right: eye_2,
-		//						//				mouth:     mouth1,
-		//					})
-		//				} else {
-		//					faces = append(faces, face{
-		//						coord:     faceCoords,
-		//						eye_left:  eye_2,
-		//						eye_right: eye_1,
-		//						//				mouth:     mouth1,
-		//					})
-		//				}
 	}
 	fmt.Println(faces)
 	return faces
 }
+
+
+
+func ToByteBuffer(image *opencv.IplImage) []byte{
+
+	buf := new(bytes.Buffer)
+	err := jpeg.Encode(buf, image.ToImage(), nil)
+	if err != nil {
+		panic(err)
+	}
+	return buf.Bytes()
+}
+
 
 func (detector *FaceDetector) Detect(img []byte) faces {
 
