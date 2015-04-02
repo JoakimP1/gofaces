@@ -11,7 +11,8 @@ import (
 	"fmt"
 	"github.com/lazywei/go-opencv/opencv"
 	"math/rand"
-	"strconv"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -22,6 +23,20 @@ func checkErr(err error) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func isPicture(filename string) bool {
+	ext := strings.ToLower(filepath.Ext(filename))
+
+	if ext == ".jpg" {
+		return true
+	} else if ext == ".jpeg" {
+		return true
+	} else if ext == ".pgm" {
+		return true
+	}
+
+	return false
 }
 
 func GetFileNames(path string) []string {
@@ -35,8 +50,8 @@ func GetFileNames(path string) []string {
 		fis, err := dir.Readdir(-1) // -1 means return all the FileInfos
 		checkErr(err)
 		for _, fileinfo := range fis {
-			if !fileinfo.IsDir() {
-				filenames = append(filenames, path+fileinfo.Name())
+			if !fileinfo.IsDir() && isPicture(fileinfo.Name()) {
+				filenames = append(filenames, path+"/"+fileinfo.Name())
 			}
 		}
 	}
@@ -49,7 +64,7 @@ func init() {
 	log.SetFlags(log.Flags() | log.Llongfile)
 	//currentDir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
 
-	filePath = flag.String("f", "/home/joakim/Go/src/github.com/joakimp1/gofaces/", "Path to images.")
+	filePath = flag.String("f", "/home/joakim/Go/src/github.com/joakimp1/gofaces", "Path to images.")
 	flag.Parse()
 
 	imagick.Initialize()
@@ -61,36 +76,48 @@ func loop(path string, paint, crosshair bool) {
 
 	pictureFiles = GetFileNames(path)
 
-	images := make([][]byte, len(pictureFiles))
+	//	images := make([][]byte, len(pictureFiles))
 	faceDetector := gofaces.NewFaceDetector()
 
-	for i := 0; i < len(pictureFiles); i++ {
-		images[i] = gofaces.GetNormalizedByteVectorFromFile("/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/train1/" + strconv.Itoa(i) + ".jpg")
-	}
+	//	for i := 0; i < len(pictureFiles); i++ {
+
+	//	}
+
 	fmt.Println("Pictures: ", len(pictureFiles))
 
 	for i := 0; i < len(pictureFiles); i++ {
 
-		fmt.Println("Processing picture: ", i)
+		fmt.Println("Processing picture: ", pictureFiles[i])
+		img := gofaces.GetNormalizedByteVectorFromFile(pictureFiles[i])
+		faces := faceDetector.Detect(img)
+		if len(faces) > 0 {
+			if paint {
+				img = gofaces.PaintFace(img, faces[0])
+			}
 
-		faces := faceDetector.Detect(images[i])
-		if paint {
-			images[i] = gofaces.PaintFace(images[i], faces[0])
+			if faces[0].Eyes() > 1 {
+				img = gofaces.AlignFaceInImage(img, faces[0])
+			}
+
+			if crosshair {
+				img = gofaces.Crosshair(img)
+			}
+
+			cropface := gofaces.CropOutFace(img, faces[0])
+
+			win := opencv.NewWindow("Face Detected")
+
+			win.ShowImage(opencv.DecodeImageMem(cropface))
+			opencv.WaitKey(0)
+			win.Destroy()
+		} else {
+			win := opencv.NewWindow("No face found")
+
+			win.ShowImage(opencv.DecodeImageMem(img))
+			opencv.WaitKey(0)
+			win.Destroy()
 		}
 
-		alignedFace := gofaces.AlignFaceInImage(images[i], faces[0])
-
-		if crosshair {
-			alignedFace = gofaces.Crosshair(alignedFace)
-		}
-
-		cropface := gofaces.CropOutFace(alignedFace, faces[0])
-
-		win := opencv.NewWindow("Face Detection")
-
-		win.ShowImage(opencv.DecodeImageMem(cropface))
-		opencv.WaitKey(0)
-		win.Destroy()
 	}
 }
 
@@ -112,15 +139,40 @@ func one(path string, paint bool) {
 	opencv.WaitKey(0)
 }
 
+func debug(path string) {
+	faceDetector := gofaces.NewFaceDetector()
+
+	picture := gofaces.GetNormalizedByteVectorFromFile(path)
+
+	image := opencv.DecodeImageMem(picture)
+	faceAreas := faceDetector.DetectFaces(image)
+	faces := faceDetector.DetectFacialFeatures(image, faceAreas)
+
+	picture = gofaces.PaintFaces(picture, faces)
+
+	win := opencv.NewWindow("Debug Face Detection")
+	defer win.Destroy()
+
+	win.ShowImage(opencv.DecodeImageMem(picture))
+	opencv.WaitKey(0)
+}
+
 func main() {
 
 	//	/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/train1/5.jpg
 	//
 	//one("/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/train1/16.jpg", true)
 	//one("/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/train1/18.jpg", true)
-	//one("/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/train1/1.jpg", true)
+	//one("/home/joakim/eigen/bioid/BioID_0937.pgm", true)
+
+	pictureFiles = GetFileNames("/home/joakim/eigen/bioid/")
+	for i := 0; i < len(pictureFiles); i++ {
+		debug(pictureFiles[i])
+	}
+
 	//one("/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/train1/16.jpg", true)
-	loop(*filePath+"jpg/train1/", true, true)
+	//loop(*filePath+"jpg/train1/", true, true)
+	//loop("/home/joakim/eigen/bioid", true, true)
 	//
 	//
 	//

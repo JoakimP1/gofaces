@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/lazywei/go-opencv/opencv"
+
 	"image/jpeg"
 	"math"
 )
@@ -13,6 +14,13 @@ type pixelCoord struct {
 	y      int
 	width  int
 	height int
+}
+
+type pixelArea interface {
+	X() int
+	Y() int
+	Width() int
+	Height() int
 }
 
 func (coord1 *pixelCoord) Distance(coord2 pixelCoord) int {
@@ -44,8 +52,18 @@ func (c *pixelCoord) Center() pixelCoord {
 	}
 }
 
-func (f *face) Width() int {
+func (c *pixelCoord) Flop(coord2 pixelCoord) {
+	c.x = coord2.Width() - c.X() - c.Width()
+}
 
+func (f *face) Flop(width, height int) {
+	flopAround := pixelCoord{width: width, height: height}
+	f.coord.Flop(flopAround)
+	f.eye_left.Flop(flopAround)
+	f.eye_right.Flop(flopAround)
+}
+
+func (f *face) Width() int {
 	return f.coord.width
 }
 
@@ -57,18 +75,29 @@ func (f *face) Center() pixelCoord {
 	}
 }
 
+func (f *face) Eyes() int {
+	eyes := 0
+	if f.eye_left.Width() > 0 && f.eye_left.Height() > 0 {
+		eyes++
+	}
+	if f.eye_right.Width() > 0 && f.eye_right.Height() > 0 {
+		eyes++
+	}
+	return eyes
+}
+
 func (f *face) DistanceBetweenEyes() int {
 	le := f.eye_left.Center()
 	re := f.eye_right.Center()
 	return re.x - le.x
 }
 
-func (f *face) LeftEye() pixelCoord {
-	return f.eye_left
+func (f *face) LeftEye() *pixelCoord {
+	return &f.eye_left
 }
 
-func (f *face) RightEye() pixelCoord {
-	return f.eye_right
+func (f *face) RightEye() *pixelCoord {
+	return &f.eye_right
 }
 
 type face struct {
@@ -116,12 +145,15 @@ func NewFaceDetector() *FaceDetector {
 	return detector
 }
 
-func (detector *FaceDetector) DetectEyes(image *opencv.IplImage, roi opencv.Rect) (leftEyes, rightEyes []pixelCoord) {
+func (detector *FaceDetector) DetectEyes(image *opencv.IplImage, roi pixelArea) (leftEyes, rightEyes []pixelCoord) {
 
 	var topFaceLeft, topFaceRight opencv.Rect
 
 	topFaceLeft.Init(roi.X(), roi.Y()+int(float64(roi.Height())*0.20), roi.Width()/2, int(float64(roi.Height())/2))
+
 	topFaceRight.Init(roi.X()+roi.Width()/2, roi.Y()+int(float64(roi.Height())*0.20), roi.Width()/2, int(float64(roi.Height())/2))
+
+	fmt.Println("topFaceLeft", image.Width(), image.Height(), topFaceLeft)
 
 	image.SetROI(topFaceLeft)
 	for _, eye := range detector.eyeCascade.DetectObjects(image) {
@@ -144,7 +176,7 @@ func (detector *FaceDetector) DetectEyes(image *opencv.IplImage, roi opencv.Rect
 		})
 	}
 	fmt.Println(len(rightEyes), " right eyes found")
-
+	image.ResetROI()
 	return
 }
 
@@ -196,58 +228,83 @@ func FindBestEyes(leftEyes, rightEyes []pixelCoord) (leftEye, rightEye pixelCoor
 	return leftEye, rightEye
 }
 
-func (detector *FaceDetector) DetectFaces(image *opencv.IplImage) faces {
+func (detector *FaceDetector) DetectFaces(image *opencv.IplImage) []pixelCoord {
 
-	var faces = make(faces, 0)
+	var faceCoords = make([]pixelCoord, 0)
 
 	detFaces := detector.faceCascade.DetectObjects(image)
 
-	if len(detFaces) != 1 {
-		if len(detFaces) > 1 {
-			//			panic("To many faces in image")
-		} else {
-			//			panic("No faces found in image")
-		}
-	}
 	fmt.Println(len(detFaces), " faces found")
 
 	for _, detFace := range detFaces {
 
-		faceCoords := pixelCoord{
+		faceCoords = append(faceCoords, pixelCoord{
 			x:      detFace.X(),
 			y:      detFace.Y(),
 			width:  detFace.Width(),
 			height: detFace.Height(),
-		}
-
-		leftEyes, rightEyes := detector.DetectEyes(image, *detFace)
-
-		if len( leftEyes ) == 0 || len(rightEyes) == 0 {
-			floppedImage := opencv.DecodeImageMem(Flop(ToByteBuffer(image)))
-
-			leftEyes, rightEyes := detector.DetectEyes(floppedImage, *detFace)
-
-		}
-
-		leftEye, rightEye := FindBestEyes(leftEyes, rightEyes)
-
-		faces = append(faces, face{
-			coord:     faceCoords,
-			eye_left:  leftEye,
-			eye_right: rightEye,
-			//				mouth:     mouth1,
 		})
+	}
+	return faceCoords
+}
 
+func (detector *FaceDetector) DetectFacialFeatures(image *opencv.IplImage, faceCoords []pixelCoord) faces {
+
+	var faces = make(faces, 0)
+ 
+	for _, faceCoord := range faceCoords {
+
+		leftEyes, rightEyes := detector.DetectEyes(image, &faceCoord)
+
+		if len(leftEyes) == 0 || len(rightEyes) == 0 {
+
+			//No eyes found, lets flop the picture and check again
+			fmt.Println("Flopping Picture to look for eyes")
+
+			floppedImage := opencv.DecodeImageMem(FlopImage(ToByteBuffer(image)))
+
+			floppedFaceCoords := faceCoord
+
+			floppedFaceCoords.Flop(pixelCoord{width: image.Width(), height: image.Height()})
+
+			leftEyes, rightEyes = detector.DetectEyes(floppedImage, &floppedFaceCoords)
+
+			if len(leftEyes) == 0 || len(rightEyes) == 0 {
+				faces = append(faces, face{
+					coord:     faceCoord,
+					eye_left:  pixelCoord{},
+					eye_right: pixelCoord{},
+				})
+			}
+
+			leftEye, rightEye := FindBestEyes(leftEyes, rightEyes)
+			leftEye.Flop(pixelCoord{width: image.Width(), height: image.Height()})
+			rightEye.Flop(pixelCoord{width: image.Width(), height: image.Height()})
+
+			faces = append(faces, face{
+				coord:     faceCoord,
+				eye_left:  rightEye,
+				eye_right: leftEye,
+			})
+
+		} else {
+
+			leftEye, rightEye := FindBestEyes(leftEyes, rightEyes)
+			faces = append(faces, face{
+				coord:     faceCoord,
+				eye_left:  leftEye,
+				eye_right: rightEye,
+			})
+		}
 	}
 	fmt.Println(faces)
 	return faces
 }
 
-
-
-func ToByteBuffer(image *opencv.IplImage) []byte{
+func ToByteBuffer(image *opencv.IplImage) []byte {
 
 	buf := new(bytes.Buffer)
+
 	err := jpeg.Encode(buf, image.ToImage(), nil)
 	if err != nil {
 		panic(err)
@@ -255,12 +312,11 @@ func ToByteBuffer(image *opencv.IplImage) []byte{
 	return buf.Bytes()
 }
 
-
 func (detector *FaceDetector) Detect(img []byte) faces {
 
 	image := opencv.DecodeImageMem(img)
-	faces := detector.DetectFaces(image)
-
+	faceAreas := detector.DetectFaces(image)
+	faces := detector.DetectFacialFeatures(image, faceAreas)
 	return faces
 }
 
@@ -321,6 +377,50 @@ func PaintFace(img []byte, face face) []byte {
 		opencv.Point{face.mouth.x + face.mouth.width, face.mouth.y},
 		opencv.Point{face.mouth.x, face.mouth.y + face.mouth.height},
 		opencv.ScalarAll(2), 1, 1, 0)
+
+	buf := new(bytes.Buffer)
+	err := jpeg.Encode(buf, image.ToImage(), nil)
+	if err != nil {
+		panic(err)
+	}
+	return buf.Bytes()
+}
+
+func PaintFaces(img []byte, faces faces) []byte {
+
+	image := opencv.DecodeImageMem(img)
+
+	for _, face := range faces {
+
+		opencv.Rectangle(image,
+			opencv.Point{face.coord.x + face.coord.width, face.coord.y},
+			opencv.Point{face.coord.x, face.coord.y + face.coord.height},
+			opencv.ScalarAll(0), 1, 1, 0)
+
+		le := face.LeftEye().Center()
+		re := face.RightEye().Center()
+
+		opencv.Circle(image,
+			opencv.Point{le.X(), le.Y()},
+			2,
+			opencv.ScalarAll(255), 1, 1, 0)
+
+		opencv.Circle(image,
+			opencv.Point{re.x, re.y},
+			2,
+			opencv.ScalarAll(255), 1, 1, 0)
+
+		faceCenter := face.Center()
+		opencv.Circle(image,
+			opencv.Point{faceCenter.x, faceCenter.y},
+			2,
+			opencv.ScalarAll(50), 1, 1, 0)
+
+		//		opencv.Rectangle(image,
+		//			opencv.Point{face.mouth.x + face.mouth.width, face.mouth.y},
+		//			opencv.Point{face.mouth.x, face.mouth.y + face.mouth.height},
+		//			opencv.ScalarAll(2), 1, 1, 0)
+	}
 
 	buf := new(bytes.Buffer)
 	err := jpeg.Encode(buf, image.ToImage(), nil)
