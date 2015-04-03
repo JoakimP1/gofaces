@@ -165,10 +165,17 @@ func main() {
 	//one("/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/train1/18.jpg", true)
 	//one("/home/joakim/eigen/bioid/BioID_0937.pgm", true)
 
-	pictureFiles = GetFileNames("/home/joakim/eigen/bioid/")
-	for i := 0; i < len(pictureFiles); i++ {
-		debug(pictureFiles[i])
-	}
+	///home/joakim/eigen/bioid//BioID_0039.pgm
+	//
+	//	pictureFiles = GetFileNames("/home/joakim/eigen/bioid/")
+	//	for i := 0; i < len(pictureFiles); i++ {
+	//		fmt.Println("Processing picture: ", pictureFiles[i])
+	//debug(pictureFiles[i])
+	debug("/home/joakim/eigen/bioid//BioID_0039.pgm")
+	debug("/home/joakim/eigen/bioid//BioID_0071.pgm")
+	debug("/home/joakim/eigen/bioid//BioID_0376.pgm")
+	debug("/home/joakim/eigen/bioid//BioID_1087.pgm")
+	//	}
 
 	//one("/home/joakim/Go/src/github.com/joakimp1/gofaces/jpg/train1/16.jpg", true)
 	//loop(*filePath+"jpg/train1/", true, true)
